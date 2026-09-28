@@ -1,0 +1,8 @@
+{
+ "hit@5": 0.966,
+ "precision@5": 0.221,
+ "recall@5": 0.966,
+ "mrr": 0.891,
+ "ndcg@5": 0.907,
+ "context_recall": 0.966
+}

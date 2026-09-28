@@ -1,0 +1,67 @@
+# Local PostgreSQL with the pgvector extension for the examples:
+#   docker compose up -d
+# The whole application (Chapter 27): database, migrations, API,
+# and ingestion worker, built from the Dockerfile:
+#   docker compose --profile app up --build
+# Connection string for the examples (also in .env.example):
+#   postgresql://halden:halden@localhost:5432/halden
+x-app: &app
+  build: .
+  environment: &env
+    HALDEN_DSN: postgresql://halden:halden@db:5432/halden
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    HALDEN_MODEL: ${HALDEN_MODEL:-}
+    HALDEN_MODEL_SMALL: ${HALDEN_MODEL_SMALL:-}
+  profiles: ["app"]
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      # Admin account for setup only; the application connects as
+      # the ordinary role created by docker/initdb (Chapter 19).
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres  # local development only
+      POSTGRES_DB: halden
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d halden"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # [start:app]
+  migrate:
+    <<: *app
+    command: ["python", "scripts/migrate.py"]
+    depends_on:
+      db: {condition: service_healthy}
+
+  api:
+    <<: *app
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+  worker:
+    <<: *app
+    command: ["python", "scripts/worker.py"]
+    environment:
+      <<: *env
+      HALDEN_SOURCES: >-
+        manuals=/data/manuals,policies=/data/policies,
+        contracts=/data/contracts,tickets=/data/tickets
+    volumes:
+      - ./data/sources:/data:ro
+    stop_grace_period: 60s  # let the current job finish
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+  # [end:app]
+
+volumes:
+  pgdata:
