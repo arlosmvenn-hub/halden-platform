@@ -3,8 +3,10 @@ name: ci
 on:
   push:
   pull_request:
-  schedule:
-    - cron: "17 4 * * *"  # nightly live evaluation
+  # Nightly live evaluation needs the ANTHROPIC_API_KEY secret and
+  # spends money. Uncomment once the secret is set (Chapter 27).
+  # schedule:
+  #   - cron: "17 4 * * *"
   workflow_dispatch:
 
 jobs:
